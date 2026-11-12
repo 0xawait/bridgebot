@@ -1,0 +1,75 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: bridgebot-mysql
+    restart: unless-stopped
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:?请在 .env 中配置 DB_PASSWORD}
+      MYSQL_DATABASE: ${DB_DATABASE:-bridgebot}
+      TZ: Asia/Shanghai
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  redis:
+    image: redis:7-alpine
+    container_name: bridgebot-redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 一次性任务：初始化数据库表结构，完成后退出
+  initdb:
+    build: .
+    image: bridgebot:latest
+    container_name: bridgebot-initdb
+    command: ["node", "script/initDB.js"]
+    env_file: .env
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: root
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: "no"
+
+  bot:
+    build: .
+    image: bridgebot:latest
+    container_name: bridgebot
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: root
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      initdb:
+        condition: service_completed_successfully
+    volumes:
+      - bot_logs:/app/log
+
+volumes:
+  mysql_data:
+  redis_data:
+  bot_logs:

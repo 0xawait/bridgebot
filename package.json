@@ -1,0 +1,31 @@
+{
+  "name": "bridgebot",
+  "version": "1.0.0",
+  "description": "双向机器人",
+  "private": true,
+  "main": "dist/main.js",
+  "scripts": {
+    "start": "tsc && node dist/main.js",
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "dev": "tsx watch src/main.ts",
+    "typecheck": "tsc --noEmit",
+    "initDB": "node script/initDB.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "devDependencies": {
+    "typescript": "^7.0.2"
+  },
+  "dependencies": {
+    "@grammyjs/runner": "^2.0.3",
+    "dotenv": "^18.0.10",
+    "grammy": "^1.46.0",
+    "ioredis": "^6.0.0",
+    "mysql2": "^3.24.6",
+    "winston": "^3.19.0",
+    "winston-daily-rotate-file": "^5.0.0"
+  }
+}
