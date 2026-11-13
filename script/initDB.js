@@ -44,6 +44,7 @@ const CREATE_TABLE_SQLS = [
   \`del_video\` enum('enable','disable') NOT NULL DEFAULT 'disable' COMMENT '视频消息删除：enable=开启，disable=关闭',
   \`del_file\` enum('enable','disable') NOT NULL DEFAULT 'disable' COMMENT '文件消息删除：enable=开启，disable=关闭',
   \`del_inline\` enum('enable','disable') NOT NULL DEFAULT 'disable' COMMENT '内联消息删除：enable=开启，disable=关闭',
+  \`del_guest_bot\` enum('enable','disable') NOT NULL DEFAULT 'disable' COMMENT '访客机器人消息删除：enable=开启，disable=关闭',
   \`del_reply_chat\` enum('enable','disable') NOT NULL DEFAULT 'disable' COMMENT '引用频道或群组消息删除：enable=开启，disable=关闭',
   \`del_sender_chat\` enum('enable','disable') NOT NULL DEFAULT 'disable' COMMENT '频道或群组身份消息删除：enable=开启，disable=关闭',
   \`del_contact\` enum('enable','disable') NOT NULL DEFAULT 'disable' COMMENT '名片消息删除：enable=开启，disable=关闭',
@@ -143,6 +144,12 @@ const COLUMN_SQLS = [
         column: 'del_inline',
         sql: `ALTER TABLE \`sk_group\`
   ADD COLUMN \`del_inline\` enum('enable','disable') NOT NULL DEFAULT 'disable' COMMENT '内联消息删除：enable=开启，disable=关闭' AFTER \`del_file\``,
+    },
+    {
+        table: 'sk_group',
+        column: 'del_guest_bot',
+        sql: `ALTER TABLE \`sk_group\`
+  ADD COLUMN \`del_guest_bot\` enum('enable','disable') NOT NULL DEFAULT 'disable' COMMENT '访客机器人消息删除：enable=开启，disable=关闭' AFTER \`del_inline\``,
     },
     {
         table: 'sk_group',

@@ -77,6 +77,28 @@ function isReplyToChat(message: Message): boolean {
 }
 
 /**
+ * 判断消息是否为访客机器人消息
+ * 说明：访客机器人（Guest Bot）无需加入群聊即可响应用户查询并在群内发消息，
+ * 此类消息的 from 为机器人本身，触发来源记录在 guest_bot_caller_user / guest_bot_caller_chat
+ * @param message 群消息
+ * @returns 是否为访客机器人消息
+ */
+function isGuestBotMessage(message: Message): boolean {
+    const callerUser = 'guest_bot_caller_user' in message ? message.guest_bot_caller_user : undefined;
+    const callerChat = 'guest_bot_caller_chat' in message ? message.guest_bot_caller_chat : undefined;
+    return Boolean(callerUser || callerChat);
+}
+
+/**
+ * 读取访客机器人消息的触发用户
+ * @param message 群消息
+ * @returns 触发用户的 ID，非访客消息或由频道触发时返回 undefined
+ */
+function getGuestBotCallerId(message: Message): number | undefined {
+    return 'guest_bot_caller_user' in message ? message.guest_bot_caller_user?.id : undefined;
+}
+
+/**
  * 判断消息命中的自动删除规则
  * @param message 群消息
  * @param rules 规则开关
@@ -92,6 +114,7 @@ function detectViolation(
     regexes: RegExp[],
     maxTextLength: number
 ): GroupRuleKey | null {
+    if (rules.guest_bot && isGuestBotMessage(message)) return 'guest_bot';
     if (rules.forward && 'forward_origin' in message && message.forward_origin) return 'forward';
     if (rules.sticker && 'sticker' in message && message.sticker) return 'sticker';
     if (rules.photo && 'photo' in message && message.photo) return 'photo';
@@ -125,7 +148,8 @@ export function registerGroupGuardHandler(bot: Bot): void {
             return;
         }
 
-        if (ctx.from?.is_bot) {
+        // 访客机器人消息由机器人发出，需放行进入规则检测；其余机器人消息一律跳过
+        if (ctx.from?.is_bot && !isGuestBotMessage(message)) {
             await next();
             return;
         }
@@ -140,8 +164,11 @@ export function registerGroupGuardHandler(bot: Bot): void {
 
             const { rules, keywords, regexes, whitelist, maxTextLength } = config;
 
+            // 访客机器人消息的发送者为机器人本身，白名单与日志统一使用实际触发者
+            const senderId = getGuestBotCallerId(message) ?? ctx.from?.id;
+
             // 白名单用户的消息不做任何删除
-            if (ctx.from && whitelist.includes(ctx.from.id)) {
+            if (senderId !== undefined && whitelist.includes(senderId)) {
                 await next();
                 return;
             }
@@ -161,7 +188,7 @@ export function registerGroupGuardHandler(bot: Bot): void {
             try {
                 await ctx.api.deleteMessage(chat.id, message.message_id);
                 logger.info(
-                    `群消息自动删除: chatId=${chat.id}, messageId=${message.message_id}, rule=${rule}, userId=${ctx.from?.id ?? 0}`
+                    `群消息自动删除: chatId=${chat.id}, messageId=${message.message_id}, rule=${rule}, userId=${senderId ?? 0}`
                 );
                 return;
             } catch (err) {

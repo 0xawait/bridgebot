@@ -84,3 +84,12 @@ src/utils/              工具函数（HTML 处理、键盘构建）
 - 表名前缀统一为 `sk_`，建表语句需与 `script/initDB.js` 保持一致。
 - 新增环境变量必须同步更新 `.env.example`。
 - 修改后可使用 `npm run typecheck` 做静态校验。
+
+### 数据库变更记录
+
+新增群组自动删除规则「访客机器人消息」，为 `sk_group` 增加字段：
+
+```sql
+ALTER TABLE `sk_group`
+  ADD COLUMN `del_guest_bot` enum('enable','disable') NOT NULL DEFAULT 'disable' COMMENT '访客机器人消息删除：enable=开启，disable=关闭' AFTER `del_inline`;
+```

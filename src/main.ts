@@ -19,10 +19,10 @@ const bot = new Bot(BOT_CONFIG.token, {
 });
 
 // DEBUG
-// bot.use(async (ctx, next) => {
-//     logger.info(`收到更新 ${JSON.stringify(ctx.update)}`);
-//     await next();
-// });
+bot.use(async (ctx, next) => {
+    logger.info(`收到更新 ${JSON.stringify(ctx.update)}`);
+    await next();
+});
 
 // 注册 start 回调查询命令
 registerStartHandler(bot);

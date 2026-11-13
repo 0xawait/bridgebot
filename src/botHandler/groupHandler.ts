@@ -261,6 +261,7 @@ const GROUP_RULE_LABELS: Record<GroupRuleKey, string> = {
     video: '视频消息',
     file: '文件消息',
     inline: '内联消息',
+    guest_bot: '访客机器人',
     reply_chat: '引用消息',
     sender_chat: '马甲消息',
     contact: '名片消息',

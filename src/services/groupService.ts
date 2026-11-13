@@ -246,6 +246,7 @@ export type GroupRuleKey =
     | 'video'
     | 'file'
     | 'inline'
+    | 'guest_bot'
     | 'reply_chat'
     | 'sender_chat'
     | 'contact'
@@ -261,6 +262,7 @@ export const GROUP_RULE_KEYS: GroupRuleKey[] = [
     'video',
     'file',
     'inline',
+    'guest_bot',
     'reply_chat',
     'sender_chat',
     'contact',
@@ -280,6 +282,7 @@ const RULE_COLUMN_MAP: Record<GroupRuleKey, string> = {
     video: 'del_video',
     file: 'del_file',
     inline: 'del_inline',
+    guest_bot: 'del_guest_bot',
     reply_chat: 'del_reply_chat',
     sender_chat: 'del_sender_chat',
     contact: 'del_contact',
@@ -296,6 +299,7 @@ interface GroupRuleRow extends RowDataPacket {
     del_video: 'enable' | 'disable';
     del_file: 'enable' | 'disable';
     del_inline: 'enable' | 'disable';
+    del_guest_bot: 'enable' | 'disable';
     del_reply_chat: 'enable' | 'disable';
     del_sender_chat: 'enable' | 'disable';
     del_contact: 'enable' | 'disable';
@@ -382,7 +386,7 @@ export async function findEnabledGroup(chatId: number): Promise<GroupInfo | null
 export async function getGroupRules(chatId: number): Promise<GroupRuleConfig | null> {
     const rows = await dbQuery<GroupRuleRow[]>(
         'SELECT `del_keyword`, `del_link`, `del_forward`, `del_sticker`, `del_photo`, `del_video`, `del_file`, ' +
-            '`del_inline`, `del_reply_chat`, `del_sender_chat`, `del_contact`, `del_long_text` ' +
+            '`del_inline`, `del_guest_bot`, `del_reply_chat`, `del_sender_chat`, `del_contact`, `del_long_text` ' +
             'FROM `sk_group` WHERE `chat_id` = ? AND `status` = \'enable\' LIMIT 1',
         [chatId]
     );
@@ -398,6 +402,7 @@ export async function getGroupRules(chatId: number): Promise<GroupRuleConfig | n
         video: row.del_video === 'enable',
         file: row.del_file === 'enable',
         inline: row.del_inline === 'enable',
+        guest_bot: row.del_guest_bot === 'enable',
         reply_chat: row.del_reply_chat === 'enable',
         sender_chat: row.del_sender_chat === 'enable',
         contact: row.del_contact === 'enable',
