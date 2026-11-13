@@ -27,10 +27,24 @@ const MAX_BUTTON_URL_LENGTH = 512;
 const PREVIEW_AUTO_DELETE_MS = 5000;
 
 /** 配置操作等待的输入类型 */
-type ConfigState = { type: 'awaitText' } | { type: 'awaitButton' } | { type: 'awaitGroupId' };
+type ConfigStateType = 'awaitText' | 'awaitButton' | 'awaitGroupId';
+
+/** 配置操作等待的输入状态 */
+type ConfigState = {
+    type: ConfigStateType;
+    /** 原面板消息所在会话 ID */
+    panelChatId?: number | undefined;
+    /** 原面板消息 ID */
+    panelMessageId?: number | undefined;
+    /** 输入提示消息 ID */
+    promptMessageId?: number | undefined;
+};
 
 /** 已支持的配置输入类型 */
-const CONFIG_STATE_TYPES: ConfigState['type'][] = ['awaitText', 'awaitButton', 'awaitGroupId'];
+const CONFIG_STATE_TYPES: ConfigStateType[] = ['awaitText', 'awaitButton', 'awaitGroupId'];
+
+/** 面板消息定位信息 */
+type PanelTarget = { chatId: number; messageId: number };
 
 /** 配置输入状态缓存 Key 前缀 */
 const CONFIG_STATE_KEY_PREFIX = 'bot:config:state:';
@@ -101,7 +115,7 @@ async function deletePendingState(userId: number): Promise<void> {
  * @param ctx 机器人上下文
  * @returns 是否具备超级管理员权限
  */
-function isSuperAdmin(ctx: Context): boolean {
+export function isSuperAdmin(ctx: Context): boolean {
     return Boolean(BOT_CONFIG.superAdminId) && ctx.from?.id === BOT_CONFIG.superAdminId;
 }
 
@@ -168,8 +182,8 @@ function buildPanelText(content: string, buttons: WelcomeButton[], chatId: numbe
  */
 function buildPanelKeyboard(): InlineKeyboard {
     return new InlineKeyboard()
-        .text('修改客服群组ID', 'wcfg:group')
-        .icon('5258215635996908355')
+        .text('配置双向群组ID', 'wcfg:group')
+        .icon('5260687681733533075')
         .row()
         .text('修改文字', 'wcfg:text')
         .icon('5258215635996908355')
@@ -179,7 +193,10 @@ function buildPanelKeyboard(): InlineKeyboard {
         .text('预览', 'wcfg:preview')
         .icon('5258254475386167466')
         .text('清空', 'wcfg:clear')
-        .icon('5258130763148172425');
+        .icon('5258130763148172425')
+        .row()
+        .text('群组管理', 'gcfg:panel')
+        .icon('5258513401784573443');
 }
 
 /**
@@ -241,10 +258,23 @@ async function replyPanel(ctx: Context): Promise<void> {
  * @param ctx 机器人上下文
  * @param text 新文案
  * @param keyboard 新键盘
+ * @param target 需要编辑的原面板消息，传入时以此为准
  * @returns 编辑完成后的 Promise
  */
-async function editPanel(ctx: Context, text: string, keyboard: InlineKeyboard): Promise<void> {
+async function editPanel(
+    ctx: Context,
+    text: string,
+    keyboard: InlineKeyboard,
+    target?: PanelTarget
+): Promise<void> {
     try {
+        if (target) {
+            await ctx.api.editMessageText(target.chatId, target.messageId, text, {
+                parse_mode: 'HTML',
+                reply_markup: keyboard,
+            });
+            return;
+        }
         await ctx.editMessageText(text, {
             parse_mode: 'HTML',
             reply_markup: keyboard,
@@ -252,6 +282,83 @@ async function editPanel(ctx: Context, text: string, keyboard: InlineKeyboard): 
     } catch (err) {
         logger.warn(`编辑配置面板失败: ${err instanceof Error ? err.message : err}`);
     }
+}
+
+/**
+ * 从输入状态中提取原面板消息定位信息
+ * @param state 输入状态
+ * @returns 面板消息定位信息，缺失时返回 undefined
+ */
+function buildPanelTarget(state: ConfigState): PanelTarget | undefined {
+    if (!state.panelChatId || !state.panelMessageId) return undefined;
+    return { chatId: state.panelChatId, messageId: state.panelMessageId };
+}
+
+/**
+ * 发送输入提示并记录原面板与提示消息信息，便于输入完成后就地刷新面板
+ * @param ctx 机器人上下文
+ * @param fromId 操作者用户 ID
+ * @param type 输入类型
+ * @param promptText 提示文案
+ * @returns 发送完成后的 Promise
+ */
+async function sendInputPrompt(
+    ctx: Context,
+    fromId: number,
+    type: ConfigStateType,
+    promptText: string
+): Promise<void> {
+    const prompt = await ctx.reply(promptText);
+    await setPendingState(fromId, {
+        type,
+        panelChatId: ctx.chat?.id,
+        panelMessageId: ctx.callbackQuery?.message?.message_id,
+        promptMessageId: prompt.message_id,
+    });
+}
+
+/**
+ * 删除输入提示消息与用户回复的消息
+ * @param ctx 机器人上下文
+ * @param state 输入状态
+ * @returns 删除完成后的 Promise
+ */
+async function deleteInputMessages(ctx: Context, state: ConfigState): Promise<void> {
+    const targets: PanelTarget[] = [];
+    if (state.panelChatId && state.promptMessageId) {
+        targets.push({ chatId: state.panelChatId, messageId: state.promptMessageId });
+    }
+    const replyChatId = ctx.chat?.id;
+    const replyMessageId = ctx.message?.message_id;
+    if (replyChatId && replyMessageId) {
+        targets.push({ chatId: replyChatId, messageId: replyMessageId });
+    }
+
+    for (const target of targets) {
+        try {
+            await ctx.api.deleteMessage(target.chatId, target.messageId);
+        } catch (err) {
+            logger.warn(`删除配置输入消息失败: ${err instanceof Error ? err.message : err}`);
+        }
+    }
+}
+
+/**
+ * 输入完成后刷新原面板，原面板信息缺失时改为发送新面板
+ * @param ctx 机器人上下文
+ * @param state 输入状态
+ * @returns 刷新完成后的 Promise
+ */
+async function refreshPanelAfterInput(ctx: Context, state: ConfigState): Promise<void> {
+    const target = buildPanelTarget(state);
+    const [{ content, buttons }, chatId] = await Promise.all([getWelcomeConfig(), getGroupChatId()]);
+    const text = buildPanelText(content, buttons, chatId);
+
+    if (!target) {
+        await ctx.reply(text, { parse_mode: 'HTML', reply_markup: buildPanelKeyboard() });
+        return;
+    }
+    await editPanel(ctx, text, buildPanelKeyboard(), target);
 }
 
 /**
@@ -268,7 +375,6 @@ async function registerSuperAdminCommands(bot: Bot): Promise<void> {
             [
                 { command: 'start', description: '开始使用' },
                 { command: 'config', description: '机器人配置' },
-                { command: 'id', description: '获取当前群组 ID' },
             ],
             { scope: { type: 'chat', chat_id: BOT_CONFIG.superAdminId } }
         );
@@ -325,8 +431,10 @@ export function registerConfigHandler(bot: Bot): void {
             }
 
             if (action === 'group') {
-                await setPendingState(fromId, { type: 'awaitGroupId' });
-                await ctx.reply(
+                await sendInputPrompt(
+                    ctx,
+                    fromId,
+                    'awaitGroupId',
                     '请发送要配置的群组 ID（可在目标群组中发送 /id 获取）。\n发送 /cancel 取消操作。'
                 );
                 return;
@@ -340,8 +448,12 @@ export function registerConfigHandler(bot: Bot): void {
             }
 
             if (action === 'text') {
-                await setPendingState(fromId, { type: 'awaitText' });
-                await ctx.reply('请发送新的欢迎语文字（支持 Telegram HTML 格式）。\n发送 /cancel 取消操作。');
+                await sendInputPrompt(
+                    ctx,
+                    fromId,
+                    'awaitText',
+                    '请发送新的欢迎语文字（支持 Telegram HTML 格式）。\n发送 /cancel 取消操作。'
+                );
                 return;
             }
 
@@ -351,8 +463,10 @@ export function registerConfigHandler(bot: Bot): void {
                     await ctx.reply(`按钮行数已达上限（${WELCOME_MAX_ROWS} 行），请先删除后再添加。`);
                     return;
                 }
-                await setPendingState(fromId, { type: 'awaitButton' });
-                await ctx.reply(
+                await sendInputPrompt(
+                    ctx,
+                    fromId,
+                    'awaitButton',
                     '请发送按钮信息，每行代表键盘的一行，同一行多个按钮用 & 分隔：\n' +
                     '官方网站|https://example.com\n' +
                     '官方网站|https://example.com&帮助中心|https://example.com/help\n\n' +
@@ -439,7 +553,6 @@ export function registerConfigHandler(bot: Bot): void {
         try {
             const state = await getPendingState(fromId);
             if (!state) {
-                // 无待处理状态时交给后续中间件处理（如其他命令）
                 await next();
                 return;
             }
@@ -451,11 +564,10 @@ export function registerConfigHandler(bot: Bot): void {
 
             if (text === '/cancel') {
                 await deletePendingState(fromId);
-                await ctx.reply('已取消配置操作。');
+                await deleteInputMessages(ctx, state);
                 return;
             }
 
-            // 输入状态中不处理其他命令
             if (text.startsWith('/')) return;
 
             if (state.type === 'awaitText') {
@@ -471,7 +583,8 @@ export function registerConfigHandler(bot: Bot): void {
                 await setWelcomeContent(text);
                 await deletePendingState(fromId);
                 logger.info(`超级管理员更新欢迎语文字: userId=${fromId}, length=${text.length}`);
-                await replyPanel(ctx);
+                await deleteInputMessages(ctx, state);
+                await refreshPanelAfterInput(ctx, state);
                 return;
             }
 
@@ -490,7 +603,8 @@ export function registerConfigHandler(bot: Bot): void {
                 await setGroupChatId(chatId);
                 await deletePendingState(fromId);
                 logger.info(`超级管理员更新群组 ID: userId=${fromId}, chatId=${chatId}`);
-                await replyPanel(ctx);
+                await deleteInputMessages(ctx, state);
+                await refreshPanelAfterInput(ctx, state);
                 return;
             }
 
@@ -560,7 +674,8 @@ export function registerConfigHandler(bot: Bot): void {
             await addWelcomeButtons(parsedRows);
             await deletePendingState(fromId);
             logger.info(`超级管理员新增欢迎语按钮: userId=${fromId}, rows=${parsedRows.length}`);
-            await replyPanel(ctx);
+            await deleteInputMessages(ctx, state);
+            await refreshPanelAfterInput(ctx, state);
         } catch (err) {
             logger.error(`欢迎语配置保存失败: ${err instanceof Error ? err.stack : err}`);
             await ctx.reply('配置保存失败，请稍后重试。');

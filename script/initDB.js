@@ -29,6 +29,50 @@ const CREATE_TABLE_SQLS = [
   \`updated_at\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (\`id\`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='群组配置'`,
+    `CREATE TABLE IF NOT EXISTS \`sk_group\` (
+  \`id\` bigint unsigned NOT NULL AUTO_INCREMENT COMMENT '主键',
+  \`chat_id\` bigint NOT NULL COMMENT '群组 ID',
+  \`title\` varchar(255) NOT NULL DEFAULT '' COMMENT '群组标题',
+  \`username\` varchar(64) NOT NULL DEFAULT '' COMMENT '群组公开用户名，无公开用户名时为空串',
+  \`type\` enum('group','supergroup') NOT NULL DEFAULT 'supergroup' COMMENT '群组类型',
+  \`status\` enum('enable','disable') NOT NULL DEFAULT 'enable' COMMENT '群组状态：enable=机器人已在群内，disable=机器人已退出',
+  \`del_keyword\` enum('enable','disable') NOT NULL DEFAULT 'disable' COMMENT '关键词消息删除：enable=开启，disable=关闭',
+  \`del_link\` enum('enable','disable') NOT NULL DEFAULT 'disable' COMMENT '链接消息删除：enable=开启，disable=关闭',
+  \`del_forward\` enum('enable','disable') NOT NULL DEFAULT 'disable' COMMENT '转发消息删除：enable=开启，disable=关闭',
+  \`del_sticker\` enum('enable','disable') NOT NULL DEFAULT 'disable' COMMENT '贴纸消息删除：enable=开启，disable=关闭',
+  \`del_photo\` enum('enable','disable') NOT NULL DEFAULT 'disable' COMMENT '图片消息删除：enable=开启，disable=关闭',
+  \`del_video\` enum('enable','disable') NOT NULL DEFAULT 'disable' COMMENT '视频消息删除：enable=开启，disable=关闭',
+  \`del_file\` enum('enable','disable') NOT NULL DEFAULT 'disable' COMMENT '文件消息删除：enable=开启，disable=关闭',
+  \`del_inline\` enum('enable','disable') NOT NULL DEFAULT 'disable' COMMENT '内联消息删除：enable=开启，disable=关闭',
+  \`del_reply_chat\` enum('enable','disable') NOT NULL DEFAULT 'disable' COMMENT '引用频道或群组消息删除：enable=开启，disable=关闭',
+  \`del_sender_chat\` enum('enable','disable') NOT NULL DEFAULT 'disable' COMMENT '频道或群组身份消息删除：enable=开启，disable=关闭',
+  \`del_contact\` enum('enable','disable') NOT NULL DEFAULT 'disable' COMMENT '名片消息删除：enable=开启，disable=关闭',
+  \`del_long_text\` enum('enable','disable') NOT NULL DEFAULT 'disable' COMMENT '长文本消息删除：enable=开启，disable=关闭',
+  \`max_text_length\` int unsigned NOT NULL DEFAULT 500 COMMENT '长文本删除阈值（字符数）',
+  \`created_at\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  \`updated_at\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (\`id\`),
+  UNIQUE KEY \`uk_chat_id\` (\`chat_id\`),
+  KEY \`idx_status_created\` (\`status\`, \`created_at\`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='机器人已加入群组'`,
+    `CREATE TABLE IF NOT EXISTS \`sk_group_keyword\` (
+  \`id\` bigint unsigned NOT NULL AUTO_INCREMENT COMMENT '主键',
+  \`chat_id\` bigint NOT NULL COMMENT '群组 ID',
+  \`keyword\` varchar(64) NOT NULL COMMENT '关键词',
+  \`created_at\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  \`updated_at\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (\`id\`),
+  UNIQUE KEY \`uk_chat_keyword\` (\`chat_id\`, \`keyword\`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='群组关键词过滤配置'`,
+    `CREATE TABLE IF NOT EXISTS \`sk_group_whitelist\` (
+  \`id\` bigint unsigned NOT NULL AUTO_INCREMENT COMMENT '主键',
+  \`chat_id\` bigint NOT NULL COMMENT '群组 ID',
+  \`user_id\` bigint NOT NULL COMMENT '白名单用户 ID',
+  \`created_at\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  \`updated_at\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (\`id\`),
+  UNIQUE KEY \`uk_chat_user\` (\`chat_id\`, \`user_id\`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='群组白名单用户'`,
     `CREATE TABLE IF NOT EXISTS \`sk_user_topic\` (
   \`id\` bigint unsigned NOT NULL AUTO_INCREMENT COMMENT '主键',
   \`user_id\` bigint NOT NULL COMMENT 'Telegram 用户 ID',
@@ -51,6 +95,84 @@ const COLUMN_SQLS = [
         column: 'row_index',
         sql: `ALTER TABLE \`sk_welcome_button\`
   ADD COLUMN \`row_index\` int unsigned NOT NULL DEFAULT 0 COMMENT '所在行序号，同一行序号的按钮展示在同一行' AFTER \`url\``,
+    },
+    {
+        table: 'sk_group',
+        column: 'del_keyword',
+        sql: `ALTER TABLE \`sk_group\`
+  ADD COLUMN \`del_keyword\` enum('enable','disable') NOT NULL DEFAULT 'disable' COMMENT '关键词消息删除：enable=开启，disable=关闭' AFTER \`status\``,
+    },
+    {
+        table: 'sk_group',
+        column: 'del_link',
+        sql: `ALTER TABLE \`sk_group\`
+  ADD COLUMN \`del_link\` enum('enable','disable') NOT NULL DEFAULT 'disable' COMMENT '链接消息删除：enable=开启，disable=关闭' AFTER \`del_keyword\``,
+    },
+    {
+        table: 'sk_group',
+        column: 'del_forward',
+        sql: `ALTER TABLE \`sk_group\`
+  ADD COLUMN \`del_forward\` enum('enable','disable') NOT NULL DEFAULT 'disable' COMMENT '转发消息删除：enable=开启，disable=关闭' AFTER \`del_link\``,
+    },
+    {
+        table: 'sk_group',
+        column: 'del_sticker',
+        sql: `ALTER TABLE \`sk_group\`
+  ADD COLUMN \`del_sticker\` enum('enable','disable') NOT NULL DEFAULT 'disable' COMMENT '贴纸消息删除：enable=开启，disable=关闭' AFTER \`del_forward\``,
+    },
+    {
+        table: 'sk_group',
+        column: 'del_photo',
+        sql: `ALTER TABLE \`sk_group\`
+  ADD COLUMN \`del_photo\` enum('enable','disable') NOT NULL DEFAULT 'disable' COMMENT '图片消息删除：enable=开启，disable=关闭' AFTER \`del_sticker\``,
+    },
+    {
+        table: 'sk_group',
+        column: 'del_video',
+        sql: `ALTER TABLE \`sk_group\`
+  ADD COLUMN \`del_video\` enum('enable','disable') NOT NULL DEFAULT 'disable' COMMENT '视频消息删除：enable=开启，disable=关闭' AFTER \`del_photo\``,
+    },
+    {
+        table: 'sk_group',
+        column: 'del_file',
+        sql: `ALTER TABLE \`sk_group\`
+  ADD COLUMN \`del_file\` enum('enable','disable') NOT NULL DEFAULT 'disable' COMMENT '文件消息删除：enable=开启，disable=关闭' AFTER \`del_video\``,
+    },
+    {
+        table: 'sk_group',
+        column: 'del_inline',
+        sql: `ALTER TABLE \`sk_group\`
+  ADD COLUMN \`del_inline\` enum('enable','disable') NOT NULL DEFAULT 'disable' COMMENT '内联消息删除：enable=开启，disable=关闭' AFTER \`del_file\``,
+    },
+    {
+        table: 'sk_group',
+        column: 'del_reply_chat',
+        sql: `ALTER TABLE \`sk_group\`
+  ADD COLUMN \`del_reply_chat\` enum('enable','disable') NOT NULL DEFAULT 'disable' COMMENT '引用频道或群组消息删除：enable=开启，disable=关闭' AFTER \`del_inline\``,
+    },
+    {
+        table: 'sk_group',
+        column: 'del_sender_chat',
+        sql: `ALTER TABLE \`sk_group\`
+  ADD COLUMN \`del_sender_chat\` enum('enable','disable') NOT NULL DEFAULT 'disable' COMMENT '频道或群组身份消息删除：enable=开启，disable=关闭' AFTER \`del_reply_chat\``,
+    },
+    {
+        table: 'sk_group',
+        column: 'del_contact',
+        sql: `ALTER TABLE \`sk_group\`
+  ADD COLUMN \`del_contact\` enum('enable','disable') NOT NULL DEFAULT 'disable' COMMENT '名片消息删除：enable=开启，disable=关闭' AFTER \`del_sender_chat\``,
+    },
+    {
+        table: 'sk_group',
+        column: 'del_long_text',
+        sql: `ALTER TABLE \`sk_group\`
+  ADD COLUMN \`del_long_text\` enum('enable','disable') NOT NULL DEFAULT 'disable' COMMENT '长文本消息删除：enable=开启，disable=关闭' AFTER \`del_contact\``,
+    },
+    {
+        table: 'sk_group',
+        column: 'max_text_length',
+        sql: `ALTER TABLE \`sk_group\`
+  ADD COLUMN \`max_text_length\` int unsigned NOT NULL DEFAULT 500 COMMENT '长文本删除阈值（字符数）' AFTER \`del_long_text\``,
     },
 ];
 

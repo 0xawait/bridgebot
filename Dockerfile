@@ -32,6 +32,7 @@ COPY --from=prod-deps /app/node_modules ./node_modules
 COPY package.json ./
 COPY --from=build /app/dist ./dist
 COPY script ./script
+COPY config ./config
 
 # 日志目录，使用非 root 用户运行
 RUN mkdir -p /app/log && chown -R node:node /app

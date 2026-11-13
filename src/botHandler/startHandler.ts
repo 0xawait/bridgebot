@@ -46,6 +46,7 @@ async function handleConfig(ctx: Context): Promise<void> {
 2. 将我添加进群组，并设为<b>管理员</b>
 3. 将群组类型修改为「话题（<b>列表</b>）」模式
 4. 在群组管理员中找到我并点击，确认已开启「<b>管理话题</b>」权限
+5. 向我发送 <code>/config</code> 命令，配置会话ID即可
 <b>至此配置完成...</b>
 `;
 

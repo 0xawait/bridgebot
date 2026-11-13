@@ -5,6 +5,8 @@ import { notifySuperAdmin } from "./botHandler/notifySuperAdmin.js";
 import { registerStartHandler } from "./botHandler/startHandler.js";
 import { registerConfigHandler } from "./botHandler/configHandler.js";
 import { registerIdHandler } from "./botHandler/idHandler.js";
+import { registerGroupHandler } from "./botHandler/groupHandler.js";
+import { registerGroupGuardHandler } from "./botHandler/groupGuardHandler.js";
 import { registerBridgeHandler } from "./botHandler/bridgeHandler.js";
 import logger from "./services/loggerService.js";
 import { closePool } from "./services/mysqlService.js";
@@ -17,10 +19,10 @@ const bot = new Bot(BOT_CONFIG.token, {
 });
 
 // DEBUG
-// bot.use(async (ctx, next) => {
-//     logger.info(`收到更新 ${JSON.stringify(ctx.update)}`);
-//     await next();
-// });
+bot.use(async (ctx, next) => {
+    logger.info(`收到更新 ${JSON.stringify(ctx.update)}`);
+    await next();
+});
 
 // 注册 start 回调查询命令
 registerStartHandler(bot);
@@ -30,6 +32,12 @@ registerConfigHandler(bot);
 
 // 注册 id 群组 ID 查询命令
 registerIdHandler(bot);
+
+// 注册群组管理（入群事件同步 + 群组管理面板）
+registerGroupHandler(bot);
+
+// 注册群消息守卫
+registerGroupGuardHandler(bot);
 
 // 注册双向消息桥接管道
 registerBridgeHandler(bot);

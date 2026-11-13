@@ -68,6 +68,7 @@ services:
         condition: service_completed_successfully
     volumes:
       - bot_logs:/app/log
+      - ./config:/app/config:ro
 
 volumes:
   mysql_data:
