@@ -450,7 +450,7 @@ function buildGroupConfigKeyboard(
         .icon('5258108352008823107')
         .row()
         .text('白名单', `${GROUP_CALLBACK_PREFIX}wl:${group.chatId}`)
-        .icon('5258362837411045098')
+        .icon('5258430848218176413')
         .row()
         .text('返回', `${GROUP_CALLBACK_PREFIX}panel`)
         .icon('5258236805890710909');
@@ -471,7 +471,7 @@ function buildKeywordsText(group: GroupInfo, keywordCount: number): string {
         : ['<i>暂无内置词库</i>'];
 
     return [
-        '🔑 <b>关键词配置</b>',
+        '<tg-emoji emoji-id="5296385246579670377">🏷</tg-emoji><b>关键词配置</b>',
         '',
         `<b>群组</b>：${escapeHtml(group.title)}`,
         `<b>ID</b>：<code>${group.chatId}</code>`,
@@ -521,7 +521,7 @@ function buildKeywordsKeyboard(group: GroupInfo, keywordCount: number): InlineKe
  */
 function buildWhitelistText(group: GroupInfo, whitelistCount: number): string {
     return [
-        '🛡 <b>白名单</b>',
+        '<tg-emoji emoji-id="5258430848218176413">🎭</tg-emoji><b>白名单</b>',
         '',
         `<b>群组</b>：${escapeHtml(group.title)}`,
         `<b>ID</b>：<code>${group.chatId}</code>`,
