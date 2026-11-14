@@ -60,9 +60,10 @@ git clone https://github.com/0xawait/bridgebot.git && cd bridgebot && printf '%s
 ```text
 script/initDB.js        数据库初始化脚本（建表、补字段）
 config/                 内置关键词配置（builtinKeywords.json）
+static/img/             默认广告图片（ad.png）
 src/main.ts             程序入口
-src/botHandler/         命令与消息处理（start / config / id / bridge）
-src/services/           MySQL、Redis、日志、业务数据访问
+src/botHandler/         命令与消息处理（start / config / ad / id / bridge）
+src/services/           MySQL、Redis、日志、业务数据访问、广告调度
 src/config/             环境变量配置
 src/utils/              工具函数（HTML 处理、键盘构建）
 ```
@@ -92,4 +93,34 @@ src/utils/              工具函数（HTML 处理、键盘构建）
 ```sql
 ALTER TABLE `sk_group`
   ADD COLUMN `del_guest_bot` enum('enable','disable') NOT NULL DEFAULT 'disable' COMMENT '访客机器人消息删除：enable=开启，disable=关闭' AFTER `del_inline`;
+```
+
+新增定时广告推送模块（超级管理员 `/ad` 配置），创建广告配置表与广告按钮表：
+
+```sql
+CREATE TABLE IF NOT EXISTS `sk_ad_config` (
+  `id` tinyint unsigned NOT NULL DEFAULT 1 COMMENT '主键，固定为 1（单条广告）',
+  `text` text NOT NULL COMMENT '广告文字，支持 HTML，长期有效',
+  `image_file_id` varchar(255) NOT NULL DEFAULT '' COMMENT '广告图片 file_id，空串表示使用项目默认图片',
+  `push_minute` tinyint unsigned NOT NULL DEFAULT 0 COMMENT '每小时推送分钟档位，只允许 0 或 30',
+  `next_push_at` datetime DEFAULT NULL COMMENT '下次推送时间',
+  `last_push_at` datetime DEFAULT NULL COMMENT '最近一次推送时间',
+  `status` enum('enable','disable') NOT NULL DEFAULT 'disable' COMMENT '推送状态：enable=开启，disable=暂停',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_status_next_push` (`status`, `next_push_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='定时广告配置';
+
+CREATE TABLE IF NOT EXISTS `sk_ad_button` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `text` varchar(64) NOT NULL COMMENT '按钮文字',
+  `url` varchar(512) NOT NULL COMMENT '按钮跳转链接',
+  `row_index` int unsigned NOT NULL DEFAULT 0 COMMENT '所在行序号，同一行序号的按钮展示在同一行',
+  `sort_order` int unsigned NOT NULL DEFAULT 0 COMMENT '行内展示顺序',
+  `expire_at` datetime DEFAULT NULL COMMENT '按钮到期时间，NULL 表示永久有效',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT '定时广告按钮';
 ```

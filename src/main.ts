@@ -8,9 +8,11 @@ import { registerIdHandler } from "./botHandler/idHandler.js";
 import { registerGroupHandler } from "./botHandler/groupHandler.js";
 import { registerGroupGuardHandler } from "./botHandler/groupGuardHandler.js";
 import { registerBridgeHandler } from "./botHandler/bridgeHandler.js";
+import { registerAdHandler } from "./botHandler/adHandler.js";
 import logger from "./services/loggerService.js";
 import { closePool } from "./services/mysqlService.js";
 import { closeRedis } from "./services/redisService.js";
+import { startAdScheduler, stopAdScheduler } from "./services/adSchedulerService.js";
 
 const bot = new Bot(BOT_CONFIG.token, {
     client: {
@@ -42,7 +44,13 @@ registerGroupGuardHandler(bot);
 // 注册双向消息桥接管道
 registerBridgeHandler(bot);
 
+// 注册广告推送配置命令
+registerAdHandler(bot);
+
 const runner: RunnerHandle = run(bot);
+
+// 启动广告定时推送任务
+startAdScheduler(bot);
 
 void notifySuperAdmin(bot);
 
@@ -61,6 +69,8 @@ async function shutdown(signal: string): Promise<void> {
     try {
         await runner.stop();
         logger.info('机器人已停止接收更新');
+
+        await stopAdScheduler();
 
         await closePool();
         await closeRedis();

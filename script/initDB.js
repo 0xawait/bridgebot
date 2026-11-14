@@ -87,6 +87,30 @@ const CREATE_TABLE_SQLS = [
   UNIQUE KEY \`uk_user_id\` (\`user_id\`),
   KEY \`idx_chat_thread\` (\`chat_id\`, \`message_thread_id\`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户与客服话题映射'`,
+    `CREATE TABLE IF NOT EXISTS \`sk_ad_config\` (
+  \`id\` tinyint unsigned NOT NULL DEFAULT 1 COMMENT '主键，固定为 1（单条广告）',
+  \`text\` text NOT NULL COMMENT '广告文字，支持 HTML，长期有效',
+  \`image_file_id\` varchar(255) NOT NULL DEFAULT '' COMMENT '广告图片 file_id，空串表示使用项目默认图片',
+  \`push_minute\` tinyint unsigned NOT NULL DEFAULT 0 COMMENT '每小时推送分钟档位，只允许 0 或 30',
+  \`next_push_at\` datetime DEFAULT NULL COMMENT '下次推送时间',
+  \`last_push_at\` datetime DEFAULT NULL COMMENT '最近一次推送时间',
+  \`status\` enum('enable','disable') NOT NULL DEFAULT 'disable' COMMENT '推送状态：enable=开启，disable=暂停',
+  \`created_at\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  \`updated_at\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (\`id\`),
+  KEY \`idx_status_next_push\` (\`status\`, \`next_push_at\`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='定时广告配置'`,
+    `CREATE TABLE IF NOT EXISTS \`sk_ad_button\` (
+  \`id\` bigint unsigned NOT NULL AUTO_INCREMENT COMMENT '主键',
+  \`text\` varchar(64) NOT NULL COMMENT '按钮文字',
+  \`url\` varchar(512) NOT NULL COMMENT '按钮跳转链接',
+  \`row_index\` int unsigned NOT NULL DEFAULT 0 COMMENT '所在行序号，同一行序号的按钮展示在同一行',
+  \`sort_order\` int unsigned NOT NULL DEFAULT 0 COMMENT '行内展示顺序',
+  \`expire_at\` datetime DEFAULT NULL COMMENT '按钮到期时间，NULL 表示永久有效',
+  \`created_at\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  \`updated_at\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (\`id\`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='定时广告按钮'`,
 ];
 
 /** 存量库字段补齐语句，保证初始化脚本与线上结构一致 */

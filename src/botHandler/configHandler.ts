@@ -375,6 +375,7 @@ async function registerSuperAdminCommands(bot: Bot): Promise<void> {
             [
                 { command: 'start', description: '开始使用' },
                 { command: 'config', description: '机器人配置' },
+                { command: 'ad', description: '广告推送配置' },
             ],
             { scope: { type: 'chat', chat_id: BOT_CONFIG.superAdminId } }
         );
