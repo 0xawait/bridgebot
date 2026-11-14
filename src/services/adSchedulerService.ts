@@ -12,6 +12,8 @@ import {
     ensureDefaultAdConfig,
     getActiveAdButtons,
     getAdConfig,
+    getAdMessageId,
+    saveAdMessageId,
     type AdConfig,
 } from './adService.js';
 import { listEnabledGroups, markGroupLeft } from './groupService.js';
@@ -154,6 +156,25 @@ async function sendAdWithRetry(
 }
 
 /**
+ * 删除群组上一条广告消息，失败时仅记录告警，避免影响本轮推送
+ * @param bot 机器人实例
+ * @param chatId 群组 ID
+ * @param messageId 上一条广告消息 ID
+ * @returns 删除完成后的 Promise
+ */
+async function deletePreviousAd(bot: Bot, chatId: number, messageId: number): Promise<void> {
+    try {
+        await bot.api.deleteMessage(chatId, messageId);
+    } catch (err) {
+        // 消息已被手动删除、超过可删除时限或机器人无删除权限时忽略，不影响新广告
+        logger.warn(
+            `删除上一条广告消息失败: chatId=${chatId}, messageId=${messageId}, ` +
+                `${err instanceof Error ? err.message : String(err)}`
+        );
+    }
+}
+
+/**
  * 立即执行一轮广告推送
  * @param bot 机器人实例
  * @returns 推送结果
@@ -177,6 +198,14 @@ export async function pushAdNow(bot: Bot): Promise<AdPushResult> {
 
         for (const group of groups) {
             try {
+                // 发送前先取出上一条广告消息 ID，发送成功后再删除，发送失败时保留旧广告
+                const previousMessageId = await getAdMessageId(group.chatId).catch((err: unknown) => {
+                    logger.warn(
+                        `读取上一条广告消息记录失败: chatId=${group.chatId}, ` +
+                            `${err instanceof Error ? err.message : err}`
+                    );
+                    return null;
+                });
                 const message = await sendAdWithRetry(bot, group.chatId, text, photo, keyboard);
                 if (!config.imageFileId && !cachedFileId) {
                     const fileId = extractPhotoFileId(message);
@@ -188,6 +217,15 @@ export async function pushAdNow(bot: Bot): Promise<AdPushResult> {
                             );
                         });
                     }
+                }
+                await saveAdMessageId(group.chatId, message.message_id).catch((err: unknown) => {
+                    logger.warn(
+                        `记录广告消息 ID 失败: chatId=${group.chatId}, ` +
+                            `${err instanceof Error ? err.message : err}`
+                    );
+                });
+                if (previousMessageId) {
+                    await deletePreviousAd(bot, group.chatId, previousMessageId);
                 }
                 success += 1;
             } catch (err) {

@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import dayjs from 'dayjs';
 import type { ResultSetHeader, RowDataPacket } from 'mysql2/promise';
 import dbQuery, { withTransaction } from './mysqlService.js';
+import redis from './redisService.js';
 
 /** 默认广告文字，文字长期有效 */
 export const DEFAULT_AD_TEXT = '<tg-emoji emoji-id="5240228673738527951">🏷</tg-emoji> <b>以下均为付费广告，请自行甄别信息真伪。</b>';
@@ -329,4 +330,47 @@ export async function claimPushSlot(): Promise<boolean> {
         "`last_push_at` = NOW() WHERE `id` = 1 AND `status` = 'enable' AND `next_push_at` <= NOW()"
     );
     return result.affectedRows === 1;
+}
+
+/** 群组上一条广告消息缓存 Key 前缀 */
+const AD_MESSAGE_KEY_PREFIX = 'ad:message:';
+
+/** 上一条广告消息缓存有效期（秒），超过 Telegram 可删除时限后无需保留 */
+const AD_MESSAGE_TTL_SECONDS = 3 * 24 * 60 * 60;
+
+/**
+ * 拼接群组广告消息缓存 Key
+ * @param chatId 群组 ID
+ * @returns Redis Key
+ */
+function buildAdMessageKey(chatId: number): string {
+    return `${AD_MESSAGE_KEY_PREFIX}${chatId}`;
+}
+
+/**
+ * 查询群组上一条广告消息 ID
+ * @param chatId 群组 ID
+ * @returns 消息 ID，无缓存或数据异常时返回 null
+ */
+export async function getAdMessageId(chatId: number): Promise<number | null> {
+    const raw = await redis.get(buildAdMessageKey(chatId));
+    if (raw === null) return null;
+
+    const messageId = Number(raw);
+    return Number.isSafeInteger(messageId) && messageId > 0 ? messageId : null;
+}
+
+/**
+ * 记录群组最新一条广告消息 ID，用于下一轮推送时删除上一条
+ * @param chatId 群组 ID
+ * @param messageId 消息 ID
+ * @returns 写入完成后的 Promise
+ */
+export async function saveAdMessageId(chatId: number, messageId: number): Promise<void> {
+    await redis.set(
+        buildAdMessageKey(chatId),
+        String(messageId),
+        'EX',
+        AD_MESSAGE_TTL_SECONDS
+    );
 }
